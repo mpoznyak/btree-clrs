@@ -81,6 +81,14 @@ mod test {
         assert_eq!(node.leaf, true);
     }
 
+    #[test]
+    fn test_btree_delete() {
+        let mut btree = BTree::degree(3);
+        fill_btree(&mut btree);
+        btree.delete(19);
+        println!("{}", 1)
+    }
+
 
     fn fill_btree(btree: &mut BTree) {
         btree.insert(1);

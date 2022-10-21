@@ -18,7 +18,7 @@ impl BTree {
     pub fn order(order: usize) -> Self {
         Self {
             root: Node::empty(),
-            degree: order / 2
+            degree: order / 2,
         }
     }
 
@@ -26,19 +26,56 @@ impl BTree {
         BTree::search_from_node(&self.root, key)
     }
 
-    pub fn insert(&mut self, key:usize) {
+    pub fn insert(&mut self, key: usize) {
         if self.root.keys.len() == self.degree * 2 - 1 {
             let mut new_root = Node::new(
                 Vec::<usize>::new(),
                 Vec::<Node>::new(),
-                false
+                false,
             );
             mem::swap(&mut new_root, &mut self.root);
             self.root.children.insert(0, new_root);
             BTree::split_child(&mut self.root, 0, self.degree);
         }
         BTree::insert_nonfull(&mut self.root, key, self.degree);
+    }
 
+    pub fn delete(mut self, key: usize) -> Option<usize> {
+        return BTree::delete_from_node(&mut self.root, key, self.degree);
+    }
+
+    fn delete_from_node(root: &mut Node, key: usize, degree: usize) -> Option<usize> {
+        // case 1 leaves deletion
+        // case 2 internal node deletion
+        // case 3 internal node and the deletion leads to a fewer number of keys than required
+
+        //case 1
+        let mut i = 0;
+        for root_key in &root.keys {
+            if key < *root_key {
+                break;
+            }
+            i += 1;
+        }
+        if root.leaf {
+            if i < root.keys.len() && root.keys[i] == key {
+                root.keys.retain(|item| *item != key);
+                return Some(i);
+            }
+            return None;
+        }
+        if i < root.keys.len() && root.keys[i] == key {
+            return BTree::delete_internal_node(root, key, i);
+        } else if root.children[i].keys.len() >= degree {
+            return BTree::delete_from_node(&mut root.children[i], key, degree);
+        } else {
+
+        }
+        None
+    }
+
+    fn delete_internal_node(node: &mut Node, key: usize, index: usize) -> Option<usize> {
+        None
     }
 
     fn insert_nonfull(node: &mut Node, key: usize, degree: usize) {
