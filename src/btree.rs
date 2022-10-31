@@ -79,8 +79,42 @@ impl BTree {
         None
     }
 
+    fn delete_predecessor(root: Rc<RefCell<&mut Node>>, degree: usize) -> Option<usize> {
+        let borrowed_root = root.borrow();
+        if borrowed_root.leaf {
+            return root.borrow_mut().keys.pop(); //todo is it correct?
+        }
+        let last_index = borrowed_root.keys.len() - 1;
+        if borrowed_root.children[last_index].keys.len() >= degree {
+            BTree::delete_sibling(Rc::clone(&root), last_index + 1, last_index);
+        } else {
+            BTree::delete_merge(Rc::clone(&root), last_index, last_index + 1);
+        }
+        return BTree::delete_predecessor(Rc::new(RefCell::new(
+            &mut root.borrow_mut().children[last_index])), degree);
+    }
+
+    fn delete_successor(root: Rc<RefCell<&mut Node>>, degree: usize) -> Option<usize> {
+        let borrowed_root = root.borrow();
+        if borrowed_root.leaf {
+            return Some(root.borrow_mut().keys.remove(0));
+        }
+        if borrowed_root.children[1].keys.len() >= degree {
+            BTree::delete_sibling(Rc::clone(&root), 0, 1);
+        } else {
+            BTree::delete_merge(Rc::clone(&root), 0, 1);
+        }
+        return BTree::delete_successor(Rc::new(
+            RefCell::new(
+                &mut root.borrow_mut().children[0])), degree);
+    }
+
+    fn delete_merge(root: Rc<RefCell<&mut Node>>, i: usize, j: usize) -> Option<usize> {
+        unimplemented!()
+    }
+
     fn delete_sibling(root: Rc<RefCell<&mut Node>>, i: usize, j: usize) {
-        let mut child_node = &mut root.borrow_mut().children[i];
+        let mut child_node = &mut root.borrow_mut().children[i]; //todo borrow or borrow_mut?
         if i < j {
             let right_sibling = &mut root.borrow_mut().children[j];
             child_node.keys.push(root.borrow().keys[i]);
@@ -93,7 +127,7 @@ impl BTree {
         } else {
             let mut left_sibling = &mut root.borrow_mut().children[j];
             child_node.keys.insert(0, root.borrow_mut().keys.remove(i - 1));
-            root.borrow_mut().keys[i-1] = left_sibling.keys.pop().unwrap();
+            root.borrow_mut().keys[i - 1] = left_sibling.keys.pop().unwrap();
             if left_sibling.children.len() > 0 {
                 child_node.children.insert(0, left_sibling.children.pop().unwrap())
             }
