@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::mem;
+use std::rc::Rc;
 use crate::node::Node;
 
 #[derive(Debug, PartialEq)]
@@ -69,9 +71,33 @@ impl BTree {
         } else if root.children[i].keys.len() >= degree {
             return BTree::delete_from_node(&mut root.children[i], key, degree);
         } else {
-
+            if i != 0 && i + 2 < root.children.len() {
+                let ref_node = Rc::new(RefCell::new(root));
+                BTree::delete_sibling(ref_node, i, i - 1);
+            }
         }
         None
+    }
+
+    fn delete_sibling(root: Rc<RefCell<&mut Node>>, i: usize, j: usize) {
+        let mut child_node = &mut root.borrow_mut().children[i];
+        if i < j {
+            let right_sibling = &mut root.borrow_mut().children[j];
+            child_node.keys.push(root.borrow().keys[i]);
+            let first_r_key = right_sibling.keys[0];
+            root.borrow_mut().keys[i] = first_r_key;
+            if right_sibling.children.len() > 0 {
+                let first_r_sib = right_sibling.children.remove(0);
+                child_node.children.push(first_r_sib);
+            }
+        } else {
+            let mut left_sibling = &mut root.borrow_mut().children[j];
+            child_node.keys.insert(0, root.borrow_mut().keys.remove(i - 1));
+            root.borrow_mut().keys[i-1] = left_sibling.keys.pop().unwrap();
+            if left_sibling.children.len() > 0 {
+                child_node.children.insert(0, left_sibling.children.pop().unwrap())
+            }
+        }
     }
 
     fn delete_internal_node(node: &mut Node, key: usize, index: usize) -> Option<usize> {
