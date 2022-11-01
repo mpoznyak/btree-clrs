@@ -46,6 +46,7 @@ impl BTree {
         return BTree::delete_from_node(&mut self.root, key, self.degree);
     }
 
+    //todo wrap into RC::REFCELL
     fn delete_from_node(root: &mut Node, key: usize, degree: usize) -> Option<usize> {
         // case 1 leaves deletion
         // case 2 internal node deletion
@@ -79,7 +80,7 @@ impl BTree {
         None
     }
 
-    fn delete_predecessor(root: Rc<RefCell<&mut Node>>, degree: usize) -> Option<usize> {
+    fn delete_predecessor(&mut self, root: Rc<RefCell<&mut Node>>, degree: usize) -> Option<usize> {
         let borrowed_root = root.borrow();
         if borrowed_root.leaf {
             return root.borrow_mut().keys.pop(); //todo is it correct?
@@ -88,13 +89,13 @@ impl BTree {
         if borrowed_root.children[last_index].keys.len() >= degree {
             BTree::delete_sibling(Rc::clone(&root), last_index + 1, last_index);
         } else {
-            BTree::delete_merge(Rc::clone(&root), last_index, last_index + 1);
+            self.delete_merge(Rc::clone(&root), last_index, last_index + 1);
         }
-        return BTree::delete_predecessor(Rc::new(RefCell::new(
+        return self.delete_predecessor(Rc::new(RefCell::new(
             &mut root.borrow_mut().children[last_index])), degree);
     }
 
-    fn delete_successor(root: Rc<RefCell<&mut Node>>, degree: usize) -> Option<usize> {
+    fn delete_successor(&mut self, root: Rc<RefCell<&mut Node>>, degree: usize) -> Option<usize> {
         let borrowed_root = root.borrow();
         if borrowed_root.leaf {
             return Some(root.borrow_mut().keys.remove(0));
@@ -102,19 +103,54 @@ impl BTree {
         if borrowed_root.children[1].keys.len() >= degree {
             BTree::delete_sibling(Rc::clone(&root), 0, 1);
         } else {
-            BTree::delete_merge(Rc::clone(&root), 0, 1);
+            self.delete_merge(Rc::clone(&root), 0, 1);
         }
-        return BTree::delete_successor(Rc::new(
+        return self.delete_successor(Rc::new(
             RefCell::new(
                 &mut root.borrow_mut().children[0])), degree);
     }
 
-    fn delete_merge(root: Rc<RefCell<&mut Node>>, i: usize, j: usize) -> Option<usize> {
-        unimplemented!()
+    fn delete_merge(&mut self, root: Rc<RefCell<&mut Node>>, i: usize, j: usize) {
+        let child_node = &mut root.borrow_mut().children[i];
+        if j > i {
+            let mut right_sibling = &mut root.borrow_mut().children[j];
+            child_node.keys.push(root.borrow().keys[i]);
+            for k in 0..right_sibling.keys.len() {
+                child_node.keys.push(right_sibling.keys[k]); //todo is it correct NOT to  remove?
+                if right_sibling.children.len() > 0 {
+                    child_node.children.push(right_sibling.children.remove(k)); //todo is it correct to remove?
+                }
+            }
+            if right_sibling.children.len() > 0 {
+                child_node.children.push(right_sibling.children.pop().unwrap())
+            }
+            let mut borrowed_root = root.borrow_mut();
+            borrowed_root.keys.remove(i);
+            borrowed_root.children.remove(j);
+        } else {
+            let mut left_sibling = &mut root.borrow_mut().children[j];
+            left_sibling.keys.push(root.borrow().keys[j]);
+            for i in 0..child_node.keys.len() {
+                left_sibling.keys.push(child_node.keys[i]); //todo is it correct NOT to  remove?
+                if left_sibling.children.len() > 0 {
+                    left_sibling.children.push(child_node.children.remove(i)) //todo is it correct to remove?
+                }
+            }
+            if left_sibling.children.len() > 0 {
+                left_sibling.children.push(child_node.children.pop().unwrap());
+            }
+            let mut borrowed_root = root.borrow_mut();
+            borrowed_root.keys.remove(j);
+            borrowed_root.children.remove(i);
+        }
+
+        if root.as_ref() == self.root && root.borrow().keys.len() == 0 {
+            self.root = *root.borrow(); //todo ?????
+        }
     }
 
     fn delete_sibling(root: Rc<RefCell<&mut Node>>, i: usize, j: usize) {
-        let mut child_node = &mut root.borrow_mut().children[i]; //todo borrow or borrow_mut?
+        let mut child_node = &mut root.borrow_mut().children[i];
         if i < j {
             let right_sibling = &mut root.borrow_mut().children[j];
             child_node.keys.push(root.borrow().keys[i]);
