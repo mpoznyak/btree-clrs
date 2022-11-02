@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 use crate::node::Node;
 
-type Link = Option<Rc<RefCell<Node>>>;
+type Link = Rc<RefCell<Node>>;
 
 #[derive(Debug, PartialEq)]
 pub struct BTree {
@@ -15,26 +15,24 @@ pub struct BTree {
 impl BTree {
     pub fn degree(degree: usize) -> Self {
         Self {
-            root: Some(Rc::new(RefCell::new(Node::empty()))),
+            root: Rc::new(RefCell::new(Node::empty())),
             degree,
         }
     }
 
     pub fn order(order: usize) -> Self {
         Self {
-            root: Some(Rc::new(RefCell::new(Node::empty()))),
+            root: Rc::new(RefCell::new(Node::empty())),
             degree: order / 2,
         }
     }
 
-    pub fn search(&self, key: usize) -> Option<(Ref<Node>, usize)> {
-        self.root.as_ref().map(|node| {
-            BTree::search_from_node(node.borrow(), key)
-        }).unwrap()
+    pub fn search(&self, key: usize) -> Option<usize> {
+        BTree::search_from_node(&*self.root.borrow(), key)
     }
 
     pub fn insert(&mut self, key: usize) {
-        let mut root = &mut *self.root.as_mut().unwrap().borrow_mut();
+        let mut root = &mut *self.root.borrow_mut();
         if root.keys.len() == self.degree * 2 - 1 {
             let mut new_root = Node::new(
                 Vec::<usize>::new(),
@@ -202,18 +200,17 @@ impl BTree {
         }
     }
 
-    fn search_from_node(node: Ref<Node>, key: usize) -> Option<(Ref<Node>, usize)> {
+    fn search_from_node(node: &Node, key: usize) -> Option<usize> {
         let mut index = node.keys.len();
         while index > 0 && key < node.keys[index - 1] {
             index -= 1;
         }
         if index > 0 && key == node.keys[index - 1] {
-            Some((node, index))
+            Some(index)
         } else if node.leaf {
             None
         } else {
-            // BTree::search_from_node(node.children.get(index)?, key)
-            None
+            BTree::search_from_node(node.children.get(index)?, key)
         }
     }
 

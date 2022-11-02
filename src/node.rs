@@ -12,14 +12,6 @@ pub struct Node {
     pub leaf: bool,
 }
 
-impl Deref for Node {
-    type Target = Node;
-
-    fn deref(&self) -> &Self::Target {
-        &self
-    }
-}
-
 impl Node {
     pub fn empty() -> Self {
         Self {
