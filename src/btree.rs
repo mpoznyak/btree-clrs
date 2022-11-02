@@ -42,39 +42,40 @@ impl BTree {
         BTree::insert_nonfull(&mut self.root, key, self.degree);
     }
 
-    pub fn delete(mut self, key: usize) -> Option<usize> {
-        return BTree::delete_from_node(&mut self.root, key, self.degree);
+    pub fn delete(&mut self, key: usize) -> Option<usize> {
+        return  self.delete_from_node(Rc::new(RefCell::new(&mut self.root)), key);
     }
 
     //todo wrap into RC::REFCELL
-    fn delete_from_node(root: &mut Node, key: usize, degree: usize) -> Option<usize> {
+    fn delete_from_node(&mut self, root: Rc<RefCell<&mut Node>>, key: usize) -> Option<usize> {
         // case 1 leaves deletion
         // case 2 internal node deletion
         // case 3 internal node and the deletion leads to a fewer number of keys than required
 
         //case 1
+        let mut borrowed_root = root.borrow_mut();
         let mut i = 0;
-        for root_key in &root.keys {
+        for root_key in &borrowed_root.keys {
             if key < *root_key {
                 break;
             }
             i += 1;
         }
-        if root.leaf {
-            if i < root.keys.len() && root.keys[i] == key {
-                root.keys.retain(|item| *item != key);
+        if borrowed_root.leaf {
+            if i < borrowed_root.keys.len() && borrowed_root.keys[i] == key {
+                borrowed_root.keys.retain(|item| *item != key);
                 return Some(i);
             }
             return None;
         }
-        if i < root.keys.len() && root.keys[i] == key {
-            return BTree::delete_internal_node(root, key, i);
-        } else if root.children[i].keys.len() >= degree {
-            return BTree::delete_from_node(&mut root.children[i], key, degree);
+        if i < borrowed_root.keys.len() && borrowed_root.keys[i] == key {
+            return BTree::delete_internal_node(Rc::clone(&root), key, i);
+        } else if borrowed_root.children[i].keys.len() >= self.degree {
+            return self.delete_from_node(Rc::new(
+                RefCell::new(&mut borrowed_root.children[i])), key);
         } else {
-            if i != 0 && i + 2 < root.children.len() {
-                let ref_node = Rc::new(RefCell::new(root));
-                BTree::delete_sibling(ref_node, i, i - 1);
+            if i != 0 && i + 2 < borrowed_root.children.len() {
+                BTree::delete_sibling(Rc::clone(&root), i, i - 1);
             }
         }
         None
@@ -112,6 +113,8 @@ impl BTree {
 
     fn delete_merge(&mut self, root: Rc<RefCell<&mut Node>>, i: usize, j: usize) {
         let child_node = &mut root.borrow_mut().children[i];
+        let mut left_sibling = &mut root.borrow_mut().children[j];
+        let mut new: Option<Rc<RefCell<&mut Node>>> = None;
         if j > i {
             let mut right_sibling = &mut root.borrow_mut().children[j];
             child_node.keys.push(root.borrow().keys[i]);
@@ -124,11 +127,11 @@ impl BTree {
             if right_sibling.children.len() > 0 {
                 child_node.children.push(right_sibling.children.pop().unwrap())
             }
+            new = Some(Rc::new(RefCell::new(child_node)));
             let mut borrowed_root = root.borrow_mut();
             borrowed_root.keys.remove(i);
             borrowed_root.children.remove(j);
         } else {
-            let mut left_sibling = &mut root.borrow_mut().children[j];
             left_sibling.keys.push(root.borrow().keys[j]);
             for i in 0..child_node.keys.len() {
                 left_sibling.keys.push(child_node.keys[i]); //todo is it correct NOT to  remove?
@@ -139,14 +142,15 @@ impl BTree {
             if left_sibling.children.len() > 0 {
                 left_sibling.children.push(child_node.children.pop().unwrap());
             }
+            new = Some(Rc::new(RefCell::new(left_sibling)));
             let mut borrowed_root = root.borrow_mut();
             borrowed_root.keys.remove(j);
             borrowed_root.children.remove(i);
         }
-
-        if root.as_ref() == self.root && root.borrow().keys.len() == 0 {
-            self.root = *root.borrow(); //todo ?????
-        }
+        // todo complete resolve
+        // if root.is_root && root.borrow().keys.len() == 0 {
+        //     mem::swap(&mut self.root, *new.unwrap().borrow_mut());
+        // }
     }
 
     fn delete_sibling(root: Rc<RefCell<&mut Node>>, i: usize, j: usize) {
@@ -170,7 +174,7 @@ impl BTree {
         }
     }
 
-    fn delete_internal_node(node: &mut Node, key: usize, index: usize) -> Option<usize> {
+    fn delete_internal_node(node: Rc<RefCell<&mut Node>>, key: usize, index: usize) -> Option<usize> {
         None
     }
 
