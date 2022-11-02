@@ -27,8 +27,10 @@ impl BTree {
         }
     }
 
-    pub fn search(&self, key: usize) -> Option<(&Node, usize)> {
-        BTree::search_from_node(&self.root, key)
+    pub fn search(&self, key: usize) -> Option<(Ref<Node>, usize)> {
+        self.root.as_ref().map(|node| {
+            BTree::search_from_node(node.borrow(), key)
+        }).unwrap()
     }
 
     pub fn insert(&mut self, key: usize) {
@@ -200,17 +202,18 @@ impl BTree {
         }
     }
 
-    fn search_from_node(node: &Node, key: usize) -> Option<(&Node, usize)> {
+    fn search_from_node(node: Ref<Node>, key: usize) -> Option<(Ref<Node>, usize)> {
         let mut index = node.keys.len();
         while index > 0 && key < node.keys[index - 1] {
             index -= 1;
         }
         if index > 0 && key == node.keys[index - 1] {
-            Some((&node, index))
+            Some((node, index))
         } else if node.leaf {
             None
         } else {
-            BTree::search_from_node(node.children.get(index)?, key)
+            // BTree::search_from_node(node.children.get(index)?, key)
+            None
         }
     }
 
