@@ -1,25 +1,28 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::mem;
+use std::ops::Deref;
 use std::rc::Rc;
 use crate::node::Node;
 
+type Link = Option<Rc<RefCell<Node>>>;
+
 #[derive(Debug, PartialEq)]
 pub struct BTree {
-    root: Node,
+    root: Link,
     degree: usize,
 }
 
 impl BTree {
     pub fn degree(degree: usize) -> Self {
         Self {
-            root: Node::empty(),
+            root: Some(Rc::new(RefCell::new(Node::empty()))),
             degree,
         }
     }
 
     pub fn order(order: usize) -> Self {
         Self {
-            root: Node::empty(),
+            root: Some(Rc::new(RefCell::new(Node::empty()))),
             degree: order / 2,
         }
     }
@@ -29,22 +32,23 @@ impl BTree {
     }
 
     pub fn insert(&mut self, key: usize) {
-        if self.root.keys.len() == self.degree * 2 - 1 {
+        let mut root = &mut *self.root.as_mut().unwrap().borrow_mut();
+        if root.keys.len() == self.degree * 2 - 1 {
             let mut new_root = Node::new(
                 Vec::<usize>::new(),
                 Vec::<Node>::new(),
                 false,
             );
-            mem::swap(&mut new_root, &mut self.root);
-            self.root.children.insert(0, new_root);
-            BTree::split_child(&mut self.root, 0, self.degree);
+            mem::swap(&mut new_root, &mut root);
+            root.children.insert(0, new_root);
+            BTree::split_child(&mut root, 0, self.degree);
         }
-        BTree::insert_nonfull(&mut self.root, key, self.degree);
+        BTree::insert_nonfull(&mut root, key, self.degree);
     }
 
-    pub fn delete(&mut self, key: usize) -> Option<usize> {
-        return  self.delete_from_node(Rc::new(RefCell::new(&mut self.root)), key);
-    }
+    // pub fn delete(&mut self, key: usize) -> Option<usize> {
+    //     return  self.delete_from_node(Rc::new(RefCell::new(&mut self.root)), key);
+    // }
 
     //todo wrap into RC::REFCELL
     fn delete_from_node(&mut self, root: Rc<RefCell<&mut Node>>, key: usize) -> Option<usize> {
