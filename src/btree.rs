@@ -1,6 +1,6 @@
-use std::cell::{Ref, RefCell};
+use std::cell::{Ref, RefCell, RefMut};
 use std::mem;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use crate::node::Node;
 
@@ -118,7 +118,8 @@ impl BTree {
     fn delete_merge(&mut self, root: Rc<RefCell<&mut Node>>, i: usize, j: usize) {
         let child_node = &mut root.borrow_mut().children[i];
         let mut left_sibling = &mut root.borrow_mut().children[j];
-        let mut new: Option<Rc<RefCell<&mut Node>>> = None;
+        let mut new: &mut Node;
+        let mut removal_index: usize;
         if j > i {
             let mut right_sibling = &mut root.borrow_mut().children[j];
             child_node.keys.push(root.borrow().keys[i]);
@@ -131,10 +132,11 @@ impl BTree {
             if right_sibling.children.len() > 0 {
                 child_node.children.push(right_sibling.children.pop().unwrap())
             }
-            new = Some(Rc::new(RefCell::new(child_node)));
+            new = child_node;
             let mut borrowed_root = root.borrow_mut();
             borrowed_root.keys.remove(i);
             borrowed_root.children.remove(j);
+            removal_index = i;
         } else {
             left_sibling.keys.push(root.borrow().keys[j]);
             for i in 0..child_node.keys.len() {
@@ -146,15 +148,17 @@ impl BTree {
             if left_sibling.children.len() > 0 {
                 left_sibling.children.push(child_node.children.pop().unwrap());
             }
-            new = Some(Rc::new(RefCell::new(left_sibling)));
+            new = left_sibling;
             let mut borrowed_root = root.borrow_mut();
             borrowed_root.keys.remove(j);
             borrowed_root.children.remove(i);
+            removal_index = j;
         }
         // todo complete resolve
-        // if root.is_root && root.borrow().keys.len() == 0 {
-        //     mem::swap(&mut self.root, *new.unwrap().borrow_mut());
-        // }
+        if root.borrow().keys.len() == 0 {
+            mem::swap( self.root.borrow_mut().deref_mut(), new);
+            self.root.borrow_mut().children.remove(removal_index);
+        }
     }
 
     fn delete_sibling(root: Rc<RefCell<&mut Node>>, i: usize, j: usize) {
