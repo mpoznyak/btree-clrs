@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::ops::Deref;
-use std::rc::Rc;
 
 ///BTree node
 /// # Fields
@@ -10,20 +8,28 @@ use std::rc::Rc;
 #[derive(Debug, PartialEq)]
 pub struct Node {
     pub keys: Vec<usize>,
-    pub children: Vec<Rc<RefCell<Node>>>,
+    pub children: Vec<Node>,
     pub leaf: bool,
+}
+
+impl Deref for Node {
+    type Target = Node;
+
+    fn deref(&self) -> &Self::Target {
+        &self
+    }
 }
 
 impl Node {
     pub fn empty() -> Self {
         Self {
             keys: Vec::<usize>::new(),
-            children: Vec::<Rc<RefCell<Node>>>::new(),
+            children: Vec::<Node>::new(),
             leaf: true,
         }
     }
     pub fn new(keys: Vec<usize>,
-               children: Vec<Rc<RefCell<Node>>>,
+               children: Vec<Node>,
                leaf: bool) -> Self {
         Self {
             keys,
