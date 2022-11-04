@@ -29,8 +29,7 @@ impl BTree {
 
     /// Search for the node which contains a key
     pub fn search(&self, key: usize) -> Option<Rc<RefCell<Node>>> {
-
-        let mut next= &self.root;
+        let mut next = &self.root;
         let mut index = next.borrow().keys.len();
         while index > 0 && key < next.borrow().keys[index - 1] {
             index -= 1;
@@ -47,7 +46,7 @@ impl BTree {
             while let Some(node) = stack.pop() {
                 let borrowed = node.borrow();
                 let child = borrowed.children.get(search_index).unwrap();
-                println!("index-{}, {:?}",search_index, child);
+                println!("index-{}, {:?}", search_index, child);
                 let mut index = child.borrow().keys.len();
                 while index > 0 && key < child.borrow().keys[index - 1] {
                     index -= 1;
@@ -89,12 +88,14 @@ impl BTree {
         BTree::insert_nonfull(&mut root, key, self.degree);
     }
 
-    // pub fn delete(&mut self, key: usize) -> Option<usize> {
-    //     return  self.delete_from_node(Rc::new(RefCell::new(&mut self.root)), key);
-    // }
+    pub fn delete(&mut self, key: usize) {
+        let binding = self.root.clone();
+        let temp = &mut binding.borrow_mut();
+        self.delete_from_node(Rc::new(RefCell::new(temp)), key);
+    }
 
     //todo wrap into RC::REFCELL
-    fn delete_from_node(&mut self, root: Rc<RefCell<&mut Node>>, key: usize) -> Option<usize> {
+    fn delete_from_node(&mut self, root: Rc<RefCell<&mut Node>>, key: usize) {
         // case 1 leaves deletion
         // case 2 internal node deletion
         // case 3 internal node and the deletion leads to a fewer number of keys than required
@@ -111,21 +112,42 @@ impl BTree {
         if borrowed_root.leaf {
             if i < borrowed_root.keys.len() && borrowed_root.keys[i] == key {
                 borrowed_root.keys.retain(|item| *item != key);
-                return Some(i);
+                return;
             }
-            return None;
+            return;
         }
         if i < borrowed_root.keys.len() && borrowed_root.keys[i] == key {
-            return BTree::delete_internal_node(Rc::clone(&root), key, i);
+            BTree::delete_internal_node(Rc::clone(&root), key, i);
         } else if borrowed_root.children[i].borrow().keys.len() >= self.degree {
-            return self.delete_from_node(Rc::new(
+            self.delete_from_node(Rc::new(
                 RefCell::new(&mut borrowed_root.children[i].borrow_mut())), key);
         } else {
             if i != 0 && i + 2 < borrowed_root.children.len() {
-                BTree::delete_sibling(Rc::clone(&root), i, i - 1);
+                if borrowed_root.children[i - 1].borrow().keys.len() >= self.degree {
+                    BTree::delete_sibling(Rc::clone(&root), i, i - 1);
+                } else if borrowed_root.children[i + 1].borrow().keys.len() >= self.degree {
+                    BTree::delete_sibling(Rc::clone(&root), i, i + 1);
+                } else {
+                    self.delete_merge(Rc::clone(&root), i, i + 1)
+                }
+            } else if i == 0 {
+                if borrowed_root.children[i + 1].borrow().keys.len() >= self.degree {
+                    BTree::delete_sibling(Rc::clone(&root), i, i + 1);
+                } else {
+                    self.delete_merge(Rc::clone(&root), i, i + 1);
+                }
+            } else if i + 1 == borrowed_root.children.len() {
+                if borrowed_root.children[i - 1].borrow().keys.len() >= self.degree {
+                    BTree::delete_sibling(Rc::clone(&root), i, i -1);
+                } else {
+                    self.delete_merge(Rc::clone(&root), i, i - 1);
+                }
             }
+            let binding = self.root.clone();
+            let binding1 = binding.borrow();
+            let temp = &mut binding1.children[i].borrow_mut();
+            return self.delete_from_node(Rc::new(RefCell::new(temp)), key);
         }
-        None
     }
 
     fn delete_predecessor(&mut self, root: Rc<RefCell<&mut Node>>, degree: usize) -> Option<usize> {
@@ -199,7 +221,7 @@ impl BTree {
         }
         // todo complete resolve
         if root.borrow().keys.len() == 0 {
-            mem::swap( self.root.borrow_mut().deref_mut(), &mut new.deref_mut().borrow_mut());
+            mem::swap(self.root.borrow_mut().deref_mut(), &mut new.deref_mut().borrow_mut());
             self.root.borrow_mut().children.remove(removal_index);
         }
     }
