@@ -101,46 +101,46 @@ impl BTree {
         // case 3 internal node and the deletion leads to a fewer number of keys than required
 
         //case 1
-        let mut borrowed_root = root.borrow_mut();
+        let mut cloned_root = Rc::clone(&root);
         let mut i = 0;
-        for root_key in &borrowed_root.keys {
+        for root_key in &cloned_root.borrow().keys {
             if key < *root_key {
                 break;
             }
             i += 1;
         }
-        if borrowed_root.leaf {
-            if i < borrowed_root.keys.len() && borrowed_root.keys[i] == key {
-                borrowed_root.keys.retain(|item| *item != key);
+        if cloned_root.borrow().leaf {
+            if i < cloned_root.borrow().keys.len() && cloned_root.borrow().keys[i] == key {
+                root.borrow_mut().keys.retain(|item| *item != key);
                 return;
             }
             return;
         }
-        if i < borrowed_root.keys.len() && borrowed_root.keys[i] == key {
+        if i < cloned_root.borrow().keys.len() && cloned_root.borrow().keys[i] == key {
             self.delete_internal_node(Rc::clone(&root), key, i);
-        } else if borrowed_root.children[i].borrow().keys.len() >= self.degree {
+        } else if cloned_root.borrow().children[i].borrow().keys.len() >= self.degree {
             self.delete_from_node(Rc::new(
-                RefCell::new(&mut borrowed_root.children[i].borrow_mut())), key);
+                RefCell::new(&mut cloned_root.borrow().children[i].borrow_mut())), key);
         } else {
-            if i != 0 && i + 2 < borrowed_root.children.len() {
-                if borrowed_root.children[i - 1].borrow().keys.len() >= self.degree {
+            if i != 0 && i + 2 < cloned_root.borrow().children.len() {
+                if cloned_root.borrow().children[i - 1].borrow().keys.len() >= self.degree {
                     BTree::delete_sibling(Rc::clone(&root), i, i - 1);
-                } else if borrowed_root.children[i + 1].borrow().keys.len() >= self.degree {
+                } else if cloned_root.borrow().children[i + 1].borrow().keys.len() >= self.degree {
                     BTree::delete_sibling(Rc::clone(&root), i, i + 1);
                 } else {
                     self.delete_merge(Rc::clone(&root), i, i + 1)
                 }
             } else if i == 0 {
-                if borrowed_root.children[i + 1].borrow().keys.len() >= self.degree {
+                if cloned_root.borrow().children[i + 1].borrow().keys.len() >= self.degree {
                     BTree::delete_sibling(Rc::clone(&root), i, i + 1);
                 } else {
                     self.delete_merge(Rc::clone(&root), i, i + 1);
                 }
-            } else if i + 1 == borrowed_root.children.len() {
-                if borrowed_root.children[i - 1].borrow().keys.len() >= self.degree {
+            } else if i + 1 == cloned_root.borrow().children.len() {
+                if cloned_root.borrow().children[i - 1].borrow().keys.len() >= self.degree {
                     BTree::delete_sibling(Rc::clone(&root), i, i - 1);
                 } else {
-                    self.delete_merge(Rc::clone(&root), i, i - 1);
+                    self.delete_merge(root, i, i - 1);
                 }
             }
             let binding = self.root.clone();
@@ -181,8 +181,8 @@ impl BTree {
     }
 
     fn delete_merge(&mut self, root: Rc<RefCell<&mut Node>>, i: usize, j: usize) {
-        let child_node = &mut root.borrow_mut().children[i];
-        let mut left_sibling = &mut root.borrow_mut().children[j];
+        let child_node = &mut root.borrow_mut().children[i].clone();
+        let mut left_sibling = &mut root.borrow_mut().children[j].clone();
         let mut new: &mut Rc<RefCell<Node>>;
         let mut removal_index: usize;
         if j > i {
@@ -203,15 +203,16 @@ impl BTree {
             borrowed_root.children.remove(j);
             removal_index = i;
         } else {
+            let mut child_borrowed = child_node.borrow_mut();
             left_sibling.borrow_mut().keys.push(root.borrow().keys[j]);
-            for i in 0..child_node.borrow().keys.len() {
-                left_sibling.borrow_mut().keys.push(child_node.borrow().keys[i]); //todo is it correct NOT to  remove?
-                if left_sibling.borrow().children.len() > 0 {
-                    left_sibling.borrow_mut().children.push(child_node.borrow_mut().children.remove(i)) //todo is it correct to remove?
+            for i in 0..child_borrowed.keys.len() {
+                left_sibling.borrow_mut().keys.push(child_borrowed.keys[i]); //todo is it correct NOT to  remove?
+                if left_sibling.borrow_mut().children.len() > 0 {
+                    left_sibling.borrow_mut().children.push(child_borrowed.children.remove(i)) //todo is it correct to remove?
                 }
             }
             if left_sibling.borrow().children.len() > 0 {
-                left_sibling.borrow_mut().children.push(child_node.borrow_mut().children.pop().unwrap());
+                left_sibling.borrow_mut().children.push(child_borrowed.children.pop().unwrap());
             }
             new = left_sibling;
             let mut borrowed_root = root.borrow_mut();
@@ -219,9 +220,10 @@ impl BTree {
             borrowed_root.children.remove(i);
             removal_index = j;
         }
-        // todo complete resolve
+        // todo complete resolve root == self.root
         if root.borrow().keys.len() == 0 {
-            mem::swap(self.root.borrow_mut().deref_mut(), &mut new.deref_mut().borrow_mut());
+            let a = self.root.clone();
+            mem::swap(a.borrow_mut().deref_mut(), &mut new.deref_mut().borrow_mut());
             self.root.borrow_mut().children.remove(removal_index);
         }
     }
@@ -270,7 +272,8 @@ impl BTree {
                                         .unwrap();
             return;
         } else {
-            self.delete_merge(node.clone(), index, index + 1);
+            let binding = self.root.clone();
+            self.delete_merge(Rc::new(RefCell::new(&mut binding.borrow_mut())), index, index + 1);
             self.delete_internal_node(node.clone(), key, index - 1); //todo self.degree - 1 ?
         }
     }

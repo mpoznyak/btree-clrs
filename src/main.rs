@@ -91,13 +91,13 @@ mod test {
         assert_eq!(node.borrow().leaf, true);
     }
 
-    #[test]
-    fn test_btree_delete() {
-        let mut btree = BTree::degree(3);
-        crate::fill_btree(&mut btree);
-        btree.delete(19);
-        println!("{}", 1)
-    }
+    // #[test]
+    // fn test_btree_delete() {
+    //     let mut btree = BTree::degree(3);
+    //     crate::fill_btree(&mut btree);
+    //     btree.delete(19);
+    //     println!("{}", 1)
+    // }
 
 
 
