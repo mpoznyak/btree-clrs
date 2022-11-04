@@ -2,8 +2,6 @@ use crate::btree::BTree;
 
 mod node;
 mod btree;
-pub mod testing;
-// mod testing;
 
 fn main() {
     let mut btree = BTree::degree(3);
