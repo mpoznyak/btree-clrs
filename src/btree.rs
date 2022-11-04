@@ -117,7 +117,7 @@ impl BTree {
             return;
         }
         if i < borrowed_root.keys.len() && borrowed_root.keys[i] == key {
-            BTree::delete_internal_node(Rc::clone(&root), key, i);
+            self.delete_internal_node(Rc::clone(&root), key, i);
         } else if borrowed_root.children[i].borrow().keys.len() >= self.degree {
             self.delete_from_node(Rc::new(
                 RefCell::new(&mut borrowed_root.children[i].borrow_mut())), key);
@@ -138,7 +138,7 @@ impl BTree {
                 }
             } else if i + 1 == borrowed_root.children.len() {
                 if borrowed_root.children[i - 1].borrow().keys.len() >= self.degree {
-                    BTree::delete_sibling(Rc::clone(&root), i, i -1);
+                    BTree::delete_sibling(Rc::clone(&root), i, i - 1);
                 } else {
                     self.delete_merge(Rc::clone(&root), i, i - 1);
                 }
@@ -150,34 +150,34 @@ impl BTree {
         }
     }
 
-    fn delete_predecessor(&mut self, root: Rc<RefCell<&mut Node>>, degree: usize) -> Option<usize> {
+    fn delete_predecessor(&mut self, root: Rc<RefCell<&mut Node>>) -> Option<usize> {
         let borrowed_root = root.borrow();
         if borrowed_root.leaf {
             return root.borrow_mut().keys.pop(); //todo is it correct?
         }
         let last_index = borrowed_root.keys.len() - 1;
-        if borrowed_root.children[last_index].borrow().keys.len() >= degree {
+        if borrowed_root.children[last_index].borrow().keys.len() >= self.degree {
             BTree::delete_sibling(Rc::clone(&root), last_index + 1, last_index);
         } else {
             self.delete_merge(Rc::clone(&root), last_index, last_index + 1);
         }
         return self.delete_predecessor(Rc::new(RefCell::new(
-            &mut root.borrow().children[last_index].borrow_mut())), degree);
+            &mut root.borrow().children[last_index].borrow_mut())));
     }
 
-    fn delete_successor(&mut self, root: Rc<RefCell<&mut Node>>, degree: usize) -> Option<usize> {
+    fn delete_successor(&mut self, root: Rc<RefCell<&mut Node>>) -> Option<usize> {
         let borrowed_root = root.borrow();
         if borrowed_root.leaf {
             return Some(root.borrow_mut().keys.remove(0));
         }
-        if borrowed_root.children[1].borrow().keys.len() >= degree {
+        if borrowed_root.children[1].borrow().keys.len() >= self.degree {
             BTree::delete_sibling(Rc::clone(&root), 0, 1);
         } else {
             self.delete_merge(Rc::clone(&root), 0, 1);
         }
         return self.delete_successor(Rc::new(
             RefCell::new(
-                &mut root.borrow_mut().children[0].borrow_mut())), degree);
+                &mut root.borrow_mut().children[0].borrow_mut())));
     }
 
     fn delete_merge(&mut self, root: Rc<RefCell<&mut Node>>, i: usize, j: usize) {
@@ -247,8 +247,32 @@ impl BTree {
         }
     }
 
-    fn delete_internal_node(node: Rc<RefCell<&mut Node>>, key: usize, index: usize) -> Option<usize> {
-        None
+    fn delete_internal_node(&mut self, node: Rc<RefCell<&mut Node>>, key: usize, index: usize) {
+        if node.borrow().leaf {
+            if node.borrow().keys[index] == key {
+                node.borrow_mut().keys.remove(index);
+            }
+            return;
+        }
+        if node.borrow().children[index].borrow().keys.len() >= self.degree {
+            let binding = self.root.clone();
+            let binding1 = binding.borrow();
+            let temp = &mut binding1.children[index].borrow_mut();
+            let pred_key = self.delete_predecessor(Rc::new(RefCell::new(temp)));
+            node.clone().borrow_mut().keys[index] = pred_key.unwrap();
+            return;
+        } else if node.borrow().children[index + 1].borrow().keys.len() >= self.degree {
+            let binding = self.root.clone();
+            let binding1 = binding.borrow();
+            let temp = &mut binding1.children[index + 1].borrow_mut();
+            node.borrow_mut().keys[index] = self
+                                        .delete_successor(Rc::new(RefCell::new(temp)))
+                                        .unwrap();
+            return;
+        } else {
+            self.delete_merge(node.clone(), index, index + 1);
+            self.delete_internal_node(node.clone(), key, index - 1); //todo self.degree - 1 ?
+        }
     }
 
     fn insert_nonfull(node: &mut Node, key: usize, degree: usize) {
